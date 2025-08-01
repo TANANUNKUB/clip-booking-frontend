@@ -10,6 +10,8 @@ export interface LineUser {
 export interface BookingData {
   selectedDate: Date | null
   isConfirmed: boolean
+  bookingId: string | null
+  createdAt: string | null
 }
 
 export interface PaymentData {
@@ -39,6 +41,8 @@ interface AppState {
   setLoading: (loading: boolean) => void
   setSelectedDate: (date: Date | null) => void
   confirmBooking: () => void
+  setBookingId: (bookingId: string | null) => void
+  setCreatedAt: (createdAt: string | null) => void
   setPaymentData: (data: Partial<PaymentData>) => void
   resetPayment: () => void
   resetBooking: () => void
@@ -57,6 +61,8 @@ export const useAppStore = create<AppState>()(
       booking: {
         selectedDate: null,
         isConfirmed: false,
+        bookingId: null,
+        createdAt: null,
       },
       
       payment: {
@@ -82,6 +88,16 @@ export const useAppStore = create<AppState>()(
           booking: { ...state.booking, isConfirmed: true }
         })),
       
+      setBookingId: (bookingId) => 
+        set((state) => ({
+          booking: { ...state.booking, bookingId }
+        })),
+      
+      setCreatedAt: (createdAt) => 
+        set((state) => ({
+          booking: { ...state.booking, createdAt }
+        })),
+      
       setPaymentData: (data) => 
         set((state) => ({
           payment: { ...state.payment, ...data }
@@ -101,6 +117,8 @@ export const useAppStore = create<AppState>()(
           booking: {
             selectedDate: null,
             isConfirmed: false,
+            bookingId: null,
+            createdAt: null,
           }
         }),
       
@@ -117,6 +135,7 @@ export const useAppStore = create<AppState>()(
         lineUser: state.lineUser,
         isAuthenticated: state.isAuthenticated,
         booking: state.booking,
+        payment: state.payment,
       }),
     }
   )

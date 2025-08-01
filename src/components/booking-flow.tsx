@@ -1,39 +1,103 @@
 'use client'
 
 import { useState } from 'react'
+import { format } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useAppStore } from '@/lib/store'
+import { apiService } from '@/lib/api'
+import { cancelBooking } from '@/lib/utils'
 import { LineLogin } from './line-login'
 import { BookingCalendar } from './booking-calendar'
 import { BookingConfirmationModal } from './booking-confirmation-modal'
 import { PaymentQR } from './payment-qr'
-import { BookedDatesDisplay } from './booked-dates-display'
-import { ArrowRight, CheckCircle, Calendar, CreditCard, User } from 'lucide-react'
+import { ArrowRight, CheckCircle, Calendar, CreditCard, User, ArrowLeft, XCircle } from 'lucide-react'
 
 type BookingStep = 'login' | 'calendar' | 'payment' | 'success'
 
 export function BookingFlow() {
-  const { isAuthenticated, booking, payment } = useAppStore()
+  const { isAuthenticated, booking, payment, lineUser, resetPayment, confirmBooking, resetBooking, bookedDates, setBookingId, setCreatedAt, setBookedDates } = useAppStore()
   const [showConfirmationModal, setShowConfirmationModal] = useState(false)
+  const [showCancelModal, setShowCancelModal] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  const dateFormat = (date: Date) => {
+    return format(date, 'yyyy-MM-dd')
+  }
 
   const getCurrentStep = (): BookingStep => {
     if (!isAuthenticated) return 'login'
     if (!booking.selectedDate) return 'calendar'
+    if (!booking.isConfirmed) return 'calendar'
     if (payment.status === 'success') return 'success'
     return 'payment'
   }
 
   const currentStep = getCurrentStep()
-
   const handleContinueBooking = () => {
     setShowConfirmationModal(true)
   }
 
-  const handleConfirmBooking = () => {
-    setShowConfirmationModal(false)
-    // Payment step will be shown automatically
+  const handleConfirmBooking = async () => {
+    if (!booking.selectedDate || !lineUser) return
+
+    try {
+      // Create booking using API
+      const bookingData = {
+        user_id: lineUser.userId,
+        display_name: lineUser.displayName,
+        selected_date: dateFormat(booking.selectedDate),
+        amount: 200,
+        status: 'pending'
+      }
+
+      const response = await apiService.createBooking(bookingData)
+      
+      // Confirm booking in store and save booking ID and created_at
+      confirmBooking()
+      setBookingId(response.booking_id)
+      setCreatedAt(response.created_at)
+      setShowConfirmationModal(false)
+      setErrorMessage(null)
+    } catch (error: any) {
+      console.error(error)
+      // Check if it's a duplicate booking error
+      if (error?.status === 409 || error?.message?.includes('duplicate key value')) {
+        setErrorMessage('วันที่นี้มีคนจองไปแล้ว กรุณาเลือกวันที่อื่น')
+      } else {
+        setErrorMessage('เกิดข้อผิดพลาดในการจอง กรุณาลองใหม่อีกครั้ง')
+      }
+    }
+  }
+
+    const handleCancelBooking = () => {
+    setShowCancelModal(true)
+  }
+
+  const handleConfirmCancel = async () => {
+    if (currentStep === 'payment') {
+      await cancelBooking(
+        booking.bookingId,
+        apiService,
+        resetBooking,
+        resetPayment,
+        setBookingId,
+        setCreatedAt
+      )
+    }
+    setShowCancelModal(false)
+  }
+
+  const canCancel = currentStep === 'payment'
+
+  const handleNewBooking = () => {
+    // Reset all booking and payment data
+    resetBooking()
+    resetPayment()
+    setBookingId(null)
+    setCreatedAt(null)
   }
 
   const getStepIcon = (step: BookingStep) => {
@@ -78,14 +142,31 @@ export function BookingFlow() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-4 px-2 sm:py-8 sm:px-4">
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-4 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-            จองบริการตัดต่อวิดีโอ
-          </h1>
-          <p className="text-sm sm:text-base text-gray-600 px-2">
-            เลือกวันที่และชำระเงินเพื่อจองบริการของเรา
-          </p>
+        {/* Header with Cancel Button */}
+        <div className="relative mb-4 sm:mb-8">
+          {/* Cancel Button */}
+          {canCancel && (
+            <div className="absolute left-0 top-0">
+              <Button
+                variant="outline"
+                onClick={handleCancelBooking}
+                className="h-10 text-sm text-red-600 border-red-300 hover:bg-red-50"
+              >
+                <XCircle className="mr-2 h-4 w-4" />
+                ยกเลิกการจอง
+              </Button>
+            </div>
+          )}
+          
+          {/* Title */}
+          <div className="text-center">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+              จองบริการตัดต่อวิดีโอ
+            </h1>
+            <p className="text-sm sm:text-base text-gray-600 px-2">
+              เลือกวันที่และชำระเงินเพื่อจองบริการของเรา
+            </p>
+          </div>
         </div>
 
         {/* Progress Steps */}
@@ -136,6 +217,8 @@ export function BookingFlow() {
           </div>
         </div>
 
+
+
         {/* Main Content */}
         <div className="space-y-4 sm:space-y-6">
           {currentStep === 'login' && <LineLogin />}
@@ -143,8 +226,7 @@ export function BookingFlow() {
           {currentStep === 'calendar' && (
             <div className="space-y-4 sm:space-y-6">
               <BookingCalendar />
-              <BookedDatesDisplay />
-              {booking.selectedDate && (
+              {booking.selectedDate && !booking.isConfirmed && (
                 <div className="flex justify-center px-2">
                   <Button 
                     onClick={handleContinueBooking}
@@ -190,6 +272,17 @@ export function BookingFlow() {
                     <li>• รอการติดต่อจากทีมงาน</li>
                   </ul>
                 </div>
+                
+                <div className="flex justify-center pt-2">
+                  <Button 
+                    onClick={handleNewBooking}
+                    variant="outline"
+                    className="w-full sm:w-auto px-6 sm:px-8 h-12 sm:h-10 text-base"
+                  >
+                    จองต่อ
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           )}
@@ -200,7 +293,47 @@ export function BookingFlow() {
           isOpen={showConfirmationModal}
           onClose={() => setShowConfirmationModal(false)}
           onConfirm={handleConfirmBooking}
+          errorMessage={errorMessage}
         />
+
+        {/* Cancel Confirmation Modal */}
+        <Dialog open={showCancelModal} onOpenChange={setShowCancelModal}>
+          <DialogContent className="w-[95vw] max-w-md mx-auto p-4 sm:p-6">
+            <DialogHeader className="space-y-2">
+              <DialogTitle className="flex items-center gap-2 text-base sm:text-lg text-red-600">
+                <XCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                ยกเลิกการจอง
+              </DialogTitle>
+              <DialogDescription className="text-sm sm:text-base">
+                คุณแน่ใจหรือไม่ที่จะยกเลิกการจองนี้? การดำเนินการนี้ไม่สามารถยกเลิกได้
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <div className="bg-red-50 p-3 rounded-lg border border-red-200">
+                <p className="text-xs sm:text-sm text-red-800">
+                  <strong>หมายเหตุ:</strong> การยกเลิกการจองจะลบข้อมูลการจองทั้งหมดและคุณจะต้องจองใหม่
+                </p>
+              </div>
+
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowCancelModal(false)} 
+                  className="flex-1 h-12 sm:h-10 text-base"
+                >
+                  ยกเลิก
+                </Button>
+                <Button 
+                  onClick={handleConfirmCancel} 
+                  className="flex-1 h-12 sm:h-10 text-base bg-red-600 hover:bg-red-700"
+                >
+                  ยืนยันการยกเลิก
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )

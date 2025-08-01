@@ -1,35 +1,39 @@
-import { PaymentData } from './store'
-
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001'
 
 export interface GeneratePaymentRequest {
-  userId: string
-  displayName: string
-  selectedDate: string
+  user_id: string
+  display_name: string
+  selected_date: string
   amount: number
+  qr_code_url: string
 }
 
 export interface GeneratePaymentResponse {
-  paymentId: string
-  qrCodeUrl: string
+  payment_id: string
+  user_id: string
+  display_name: string
+  selected_date: string
   amount: number
+  status: string
+  created_at: string
+  qr_code_url: string
 }
 
 export interface PaymentStatusResponse {
-  paymentId: string
+  payment_id: string
   status: 'pending' | 'success' | 'failed'
   amount: number
   paidAt?: string
 }
 
 export interface BookingResponse {
-  bookingId: string
-  userId: string
-  displayName: string
-  selectedDate: string
+  booking_id: string
+  user_id: string
+  display_name: string
+  selected_date: string
   amount: number
-  status: 'confirmed' | 'cancelled'
-  confirmedAt: string
+  status: 'pending' | 'confirmed' | 'cancelled'
+  created_at: string
 }
 
 export class ApiService {
@@ -59,7 +63,12 @@ export class ApiService {
     })
 
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.statusText}`)
+      const errorData = await response.json().catch(() => ({}))
+      const error = new Error(`API request failed: ${response.statusText}`) as any
+      error.status = response.status
+      error.code = errorData.code
+      error.message = errorData.message || response.statusText
+      throw error
     }
 
     return response.json()
@@ -68,7 +77,13 @@ export class ApiService {
   async generatePayment(data: GeneratePaymentRequest): Promise<GeneratePaymentResponse> {
     return this.request<GeneratePaymentResponse>('/generate-payment', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        user_id: data.user_id,
+        display_name: data.display_name,
+        selected_date: data.selected_date,
+        amount: data.amount,
+        qr_code_url: data.qr_code_url
+      }),
     })
   }
 
@@ -83,15 +98,118 @@ export class ApiService {
     })
   }
 
+  async verifySlip(formData: FormData): Promise<{
+    success: boolean
+    message: string
+    status_code: number
+    errors?: string[]
+    easyslip_data?: any
+  }> {
+    const url = `${API_BASE_URL}/verify-slip-with-validation`
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      body: formData,
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      const error = new Error(`API request failed: ${response.statusText}`) as any
+      error.status = response.status
+      error.code = errorData.code
+      error.message = errorData.message || response.statusText
+      throw error
+    }
+
+    return response.json()
+  }
+
   async getBookings(): Promise<BookingResponse[]> {
     return this.request<BookingResponse[]>('/bookings')
   }
 
   async getBookedDates(): Promise<string[]> {
     const bookings = await this.getBookings()
-    return bookings
-      .filter(booking => booking.status === 'confirmed')
-      .map(booking => booking.selectedDate.split('T')[0]) // Get only date part
+    console.log("bookings", bookings)
+    return bookings.map(booking => booking.selected_date)
+  }
+
+  async createBooking(bookingData: {
+    user_id: string
+    display_name: string
+    selected_date: string
+    amount: number
+    status: string
+  }): Promise<BookingResponse> {
+    return this.request<BookingResponse>('/create-booking', {
+      method: 'POST',
+      body: JSON.stringify({
+        user_id: bookingData.user_id,
+        display_name: bookingData.display_name,
+        selected_date: bookingData.selected_date.split('T')[0],
+        amount: bookingData.amount,
+        status: bookingData.status,
+      }),
+    })
+  }
+
+  async deleteBooking(bookingId: string): Promise<{
+    success: boolean
+    message: string
+    booking_id: string
+  }> {
+    return this.request<{
+      success: boolean
+      message: string
+      booking_id: string
+    }>(`/bookings/${bookingId}`, {
+      method: 'DELETE',
+    })
+  }
+
+  async updateBooking(
+    bookingId: string,
+    updateData: {
+      user_id?: string
+      display_name?: string
+      selected_date?: string
+      amount?: number
+      status?: string
+      payment_id?: string
+    }
+  ): Promise<{
+    success: boolean
+    message: string
+    booking_id: string
+    updated_data: any
+  }> {
+    const formData = new FormData()
+    
+    // Add only provided fields to form data
+    if (updateData.user_id) formData.append('user_id', updateData.user_id)
+    if (updateData.display_name) formData.append('display_name', updateData.display_name)
+    if (updateData.selected_date) formData.append('selected_date', updateData.selected_date)
+    if (updateData.amount) formData.append('amount', updateData.amount.toString())
+    if (updateData.status) formData.append('status', updateData.status)
+    if (updateData.payment_id) formData.append('payment_id', updateData.payment_id)
+
+    const url = `${API_BASE_URL}/bookings/${bookingId}`
+    
+    const response = await fetch(url, {
+      method: 'PUT',
+      body: formData,
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      const error = new Error(`API request failed: ${response.statusText}`) as any
+      error.status = response.status
+      error.code = errorData.code
+      error.message = errorData.message || response.statusText
+      throw error
+    }
+
+    return response.json()
   }
 }
 
