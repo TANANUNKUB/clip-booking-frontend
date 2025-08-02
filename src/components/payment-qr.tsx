@@ -11,10 +11,11 @@ import { Label } from '@/components/ui/label'
 import { useAppStore } from '@/lib/store'
 import { apiService, paymentPoller } from '@/lib/api'
 import { cancelBooking } from '@/lib/utils'
-import { QrCode, CheckCircle, XCircle, Clock, Loader2, RefreshCw, Upload, FileText, ArrowLeft } from 'lucide-react'
+import { QrCode, CheckCircle, XCircle, Clock, Loader2, RefreshCw, Upload, FileText, ArrowLeft, Trash2 } from 'lucide-react'
 import generatePayload from 'promptpay-qr'
 import { QRCodeCanvas } from "qrcode.react"
 import { SlipVerificationModal } from './slip-verification-modal'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 export function PaymentQR() {
   const { 
@@ -43,6 +44,8 @@ export function PaymentQR() {
   const [paymentDeadline, setPaymentDeadline] = useState<Date | null>(null)
   const [timeRemaining, setTimeRemaining] = useState<string>('')
   const [isExpired, setIsExpired] = useState(false)
+  const [showCancelModal, setShowCancelModal] = useState(false)
+  const [isCancelling, setIsCancelling] = useState(false)
 
   useEffect(() => {
     // Generate QR code automatically when component mounts
@@ -260,6 +263,29 @@ export function PaymentQR() {
   const handleVerificationClose = () => {
     setShowVerificationModal(false)
     setSlipFile(null)
+  }
+
+  const handleCancelBooking = () => {
+    setShowCancelModal(true)
+  }
+
+  const handleConfirmCancel = async () => {
+    try {
+      setIsCancelling(true)
+      await cancelBooking(
+        booking.bookingId,
+        apiService,
+        resetBooking,
+        resetPayment,
+        setBookingId,
+        setCreatedAt
+      )
+      setShowCancelModal(false)
+    } catch (error) {
+      console.error('Failed to cancel booking:', error)
+    } finally {
+      setIsCancelling(false)
+    }
   }
 
   const formatSelectedDate = (date: Date) => {
@@ -529,6 +555,18 @@ export function PaymentQR() {
               </Button>
             </div>
           )}
+
+          {/* ปุ่มยกเลิกการจอง - อยู่ล่างสุด */}
+          <div className="pt-4 border-t">
+            <Button 
+              onClick={handleCancelBooking}
+              variant="outline"
+              className="w-full h-12 sm:h-10 text-base text-red-600 border-red-300 hover:bg-red-50"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              ยกเลิกการจอง
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -540,6 +578,54 @@ export function PaymentQR() {
         message={verificationMessage}
         onConfirm={handleVerificationConfirm}
       />
+
+      {/* Cancel Confirmation Modal */}
+      <Dialog open={showCancelModal} onOpenChange={isCancelling ? undefined : setShowCancelModal}>
+        <DialogContent className="w-[95vw] max-w-md mx-auto p-4 sm:p-6">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg text-red-600">
+              <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
+              ยกเลิกการจอง
+            </DialogTitle>
+            <DialogDescription className="text-sm sm:text-base">
+              คุณแน่ใจหรือไม่ที่จะยกเลิกการจองนี้? การดำเนินการนี้ไม่สามารถยกเลิกได้
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="bg-red-50 p-3 rounded-lg border border-red-200">
+              <p className="text-xs sm:text-sm text-red-800">
+                <strong>หมายเหตุ:</strong> การยกเลิกการจองจะลบข้อมูลการจองทั้งหมดและคุณจะต้องจองใหม่
+              </p>
+            </div>
+
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowCancelModal(false)} 
+                disabled={isCancelling}
+                className="flex-1 h-12 sm:h-10 text-base"
+              >
+                ยกเลิก
+              </Button>
+              <Button 
+                onClick={handleConfirmCancel} 
+                disabled={isCancelling}
+                className="flex-1 h-12 sm:h-10 text-base bg-red-600 hover:bg-red-700"
+              >
+                {isCancelling ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    กำลังยกเลิก...
+                  </>
+                ) : (
+                  'ยืนยันการยกเลิก'
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   )
 } 

@@ -8,12 +8,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { useAppStore } from '@/lib/store'
 import { apiService } from '@/lib/api'
-import { CalendarIcon, CheckCircle, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { CalendarIcon, CheckCircle, Loader2, ChevronLeft, ChevronRight, RefreshCw, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export function BookingCalendar() {
   const { booking, setSelectedDate, bookedDates, setBookedDates } = useAppStore()
   const [isLoadingBookedDates, setIsLoadingBookedDates] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [currentMonth, setCurrentMonth] = useState(new Date())
 
   const isDateDisabled = (date: Date) => {
@@ -36,12 +37,12 @@ export function BookingCalendar() {
   const loadBookedDates = async () => {
     try {
       setIsLoadingBookedDates(true)
-      console.log("start load booked dates")
+      setError(null)
       const dates = await apiService.getBookedDates()
-      console.log("booked dates", dates)
       setBookedDates(dates)
     } catch (error) {
       console.error('Failed to load booked dates:', error)
+      setError('ไม่สามารถโหลดข้อมูลการจองได้ กรุณาลองใหม่อีกครั้ง')
     } finally {
       setIsLoadingBookedDates(false)
     }
@@ -97,23 +98,57 @@ export function BookingCalendar() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 p-4 sm:p-6">
-        {/* Loading State */}
-        {isLoadingBookedDates && (
-          <div className="flex items-center justify-center gap-2 text-sm text-gray-600 mb-4">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            กำลังโหลดข้อมูลการจอง...
-          </div>
-        )}
-
         {/* Calendar List View */}
-        <div className="border rounded-lg p-4 sm:p-6">
+        <div className={cn(
+          "border rounded-lg p-4 sm:p-6 relative",
+          (isLoadingBookedDates || error) && "opacity-50 pointer-events-none"
+        )}>
+          {/* Loading Overlay */}
+          {isLoadingBookedDates && (
+            <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-10 pointer-events-auto">
+              <div className="text-center space-y-4 opacity-100">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto" />
+                <p className="text-sm text-gray-800 font-medium">กำลังโหลดข้อมูลการจอง...</p>
+              </div>
+            </div>
+          )}
+          {/* Error Overlay */}
+          {error && !isLoadingBookedDates && (
+            <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-10 pointer-events-auto">
+              <div className="text-center space-y-4 opacity-100">
+                <AlertCircle className="h-12 w-12 text-red-500 mx-auto" />
+                <div>
+                  <p className="text-sm text-red-800 mb-3 font-medium">{error}</p>
+                  <Button
+                    onClick={loadBookedDates}
+                    variant="outline"
+                    size="sm"
+                    className="text-red-600 border-red-300 hover:bg-red-50 font-medium"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-1" />
+                    ลองใหม่
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
-            <Button variant="ghost" size="icon" onClick={handlePrevMonth}>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={handlePrevMonth}
+              disabled={isLoadingBookedDates || !!error}
+            >
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <h3 className="text-lg font-semibold">{monthName}</h3>
-            <Button variant="ghost" size="icon" onClick={handleNextMonth}>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={handleNextMonth}
+              disabled={isLoadingBookedDates || !!error}
+            >
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
@@ -144,7 +179,7 @@ export function BookingCalendar() {
                       !isDateDisabled(date) && !bookedDates.includes(format(date, 'yyyy-MM-dd')) && "text-green-600 hover:bg-green-50"
                     )}
                     onClick={() => handleDateClick(date)}
-                    disabled={isDateDisabled(date) || bookedDates.includes(format(date, 'yyyy-MM-dd'))}
+                    disabled={isDateDisabled(date) || bookedDates.includes(format(date, 'yyyy-MM-dd')) || isLoadingBookedDates || !!error}
                   >
                     {date.getDate()}
                   </Button>

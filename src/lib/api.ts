@@ -128,6 +128,10 @@ export class ApiService {
     return this.request<BookingResponse[]>('/bookings')
   }
 
+  async getUserBookings(userId: string): Promise<BookingResponse[]> {
+    return this.request<BookingResponse[]>(`/bookings/user/${userId}`)
+  }
+
   async getBookedDates(): Promise<string[]> {
     const bookings = await this.getBookings()
     console.log("bookings", bookings)

@@ -8,20 +8,22 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { useAppStore } from '@/lib/store'
 import { apiService } from '@/lib/api'
-import { CalendarIcon, User, CreditCard, AlertCircle } from 'lucide-react'
+import { CalendarIcon, User, CreditCard, AlertCircle, Loader2 } from 'lucide-react'
 
 interface BookingConfirmationModalProps {
   isOpen: boolean
   onClose: () => void
   onConfirm: () => void
   errorMessage?: string | null
+  isConfirming?: boolean
 }
 
 export function BookingConfirmationModal({ 
   isOpen, 
   onClose, 
   onConfirm,
-  errorMessage 
+  errorMessage,
+  isConfirming = false
 }: BookingConfirmationModalProps) {
   const { booking, lineUser } = useAppStore()
 
@@ -34,7 +36,7 @@ export function BookingConfirmationModal({
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={isConfirming ? undefined : onClose}>
       <DialogContent className="w-[95vw] max-w-md mx-auto p-4 sm:p-6">
         {errorMessage ? (
           // Error State
@@ -115,15 +117,24 @@ export function BookingConfirmationModal({
                 <Button 
                   variant="outline" 
                   onClick={onClose} 
+                  disabled={isConfirming}
                   className="flex-1 h-12 sm:h-10 text-base"
                 >
                   ยกเลิก
                 </Button>
                 <Button 
                   onClick={onConfirm} 
+                  disabled={isConfirming}
                   className="flex-1 h-12 sm:h-10 text-base"
                 >
-                  ยืนยันการจอง
+                  {isConfirming ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      กำลังยืนยัน...
+                    </>
+                  ) : (
+                    'ยืนยันการจอง'
+                  )}
                 </Button>
               </div>
             </div>

@@ -13,7 +13,8 @@ import { LineLogin } from './line-login'
 import { BookingCalendar } from './booking-calendar'
 import { BookingConfirmationModal } from './booking-confirmation-modal'
 import { PaymentQR } from './payment-qr'
-import { ArrowRight, CheckCircle, Calendar, CreditCard, User, ArrowLeft, XCircle } from 'lucide-react'
+import { BookingHistory } from './booking-history'
+import { ArrowRight, CheckCircle, Calendar, CreditCard, User, ArrowLeft, XCircle, History } from 'lucide-react'
 
 type BookingStep = 'login' | 'calendar' | 'payment' | 'success'
 
@@ -21,7 +22,9 @@ export function BookingFlow() {
   const { isAuthenticated, booking, payment, lineUser, resetPayment, confirmBooking, resetBooking, bookedDates, setBookingId, setCreatedAt, setBookedDates } = useAppStore()
   const [showConfirmationModal, setShowConfirmationModal] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
+  const [showHistoryModal, setShowHistoryModal] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [isConfirming, setIsConfirming] = useState(false)
 
   const dateFormat = (date: Date) => {
     return format(date, 'yyyy-MM-dd')
@@ -44,6 +47,7 @@ export function BookingFlow() {
     if (!booking.selectedDate || !lineUser) return
 
     try {
+      setIsConfirming(true)
       // Create booking using API
       const bookingData = {
         user_id: lineUser.userId,
@@ -69,6 +73,8 @@ export function BookingFlow() {
       } else {
         setErrorMessage('เกิดข้อผิดพลาดในการจอง กรุณาลองใหม่อีกครั้ง')
       }
+    } finally {
+      setIsConfirming(false)
     }
   }
 
@@ -142,24 +148,49 @@ export function BookingFlow() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-4 px-2 sm:py-8 sm:px-4">
       <div className="max-w-4xl mx-auto">
-        {/* Header with Cancel Button */}
+        {/* Header with Cancel Button and User Profile */}
         <div className="relative mb-4 sm:mb-8">
-          {/* Cancel Button */}
-          {canCancel && (
-            <div className="absolute left-0 top-0">
+          {/* Left Side - History Button */}
+          <div className="absolute left-0 top-0">
+            {/* ปุ่มประวัติการจอง */}
+            {isAuthenticated && (
               <Button
+                onClick={() => setShowHistoryModal(true)}
                 variant="outline"
-                onClick={handleCancelBooking}
-                className="h-10 text-sm text-red-600 border-red-300 hover:bg-red-50"
+                size="sm"
+                className="bg-white/90 backdrop-blur-sm shadow-sm border hover:bg-white transition-colors"
               >
-                <XCircle className="mr-2 h-4 w-4" />
-                ยกเลิกการจอง
+                <History className="h-4 w-4 mr-1" />
+                <span className="text-xs sm:text-sm">ประวัติการจอง</span>
               </Button>
+            )}
+          </div>
+
+          {/* User Profile - มุมขวาบน */}
+          {isAuthenticated && lineUser && (
+            <div className="absolute right-0 top-0 z-10">
+              <div className="flex items-center gap-1 sm:gap-2 bg-white/90 backdrop-blur-sm rounded-full px-2 sm:px-3 py-1 sm:py-2 shadow-sm border hover:bg-white transition-colors">
+                <div className="text-right">
+                  <p className="text-xs sm:text-sm font-medium text-gray-900 leading-tight">
+                    {lineUser.displayName}
+                  </p>
+                  <p className="text-xs text-gray-500 hidden sm:block">
+                    {lineUser.userId}
+                  </p>
+                </div>
+                {lineUser.pictureUrl && (
+                  <img 
+                    src={lineUser.pictureUrl} 
+                    alt={lineUser.displayName}
+                    className="w-6 h-6 sm:w-8 sm:h-8 rounded-full border-2 border-white shadow-sm"
+                  />
+                )}
+              </div>
             </div>
           )}
           
           {/* Title */}
-          <div className="text-center">
+          <div className="text-center pt-12 sm:pt-0">
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
               จองบริการตัดต่อวิดีโอ
             </h1>
@@ -294,6 +325,7 @@ export function BookingFlow() {
           onClose={() => setShowConfirmationModal(false)}
           onConfirm={handleConfirmBooking}
           errorMessage={errorMessage}
+          isConfirming={isConfirming}
         />
 
         {/* Cancel Confirmation Modal */}
@@ -334,6 +366,12 @@ export function BookingFlow() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Booking History Modal */}
+        <BookingHistory 
+          isOpen={showHistoryModal} 
+          onClose={() => setShowHistoryModal(false)} 
+        />
       </div>
     </div>
   )

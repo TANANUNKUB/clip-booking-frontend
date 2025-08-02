@@ -19,17 +19,17 @@ const MOCK_USERS: DebugUser[] = [
   {
     userId: 'debug_user_1',
     displayName: 'ทดสอบผู้ใช้ 1',
-    pictureUrl: 'https://via.placeholder.com/100x100/4F46E5/FFFFFF?text=U1'
+    pictureUrl: 'https://picsum.photos/100/100?random=1'
   },
   {
     userId: 'debug_user_2',
     displayName: 'ทดสอบผู้ใช้ 2',
-    pictureUrl: 'https://via.placeholder.com/100x100/059669/FFFFFF?text=U2'
+    pictureUrl: 'https://picsum.photos/100/100?random=2'
   },
   {
     userId: 'debug_user_3',
     displayName: 'ทดสอบผู้ใช้ 3',
-    pictureUrl: 'https://via.placeholder.com/100x100/DC2626/FFFFFF?text=U3'
+    pictureUrl: 'https://picsum.photos/100/100?random=3'
   }
 ]
 
@@ -77,7 +77,7 @@ export function DebugLogin() {
       const customUser: DebugUser = {
         userId: `debug_custom_${Date.now()}`,
         displayName: customName.trim(),
-        pictureUrl: `https://via.placeholder.com/100x100/7C3AED/FFFFFF?text=${customName.charAt(0).toUpperCase()}`
+        pictureUrl: `https://picsum.photos/100/100?random=${Date.now()}`
       }
       
       setLineUser({
